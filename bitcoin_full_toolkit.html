@@ -1,0 +1,171 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔧 Bitcoin Full Toolkit</title>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; background: #f9f9f9; padding: 20px; }
+        section { margin-bottom: 40px; }
+        input, button { padding: 10px; font-size: 16px; margin: 5px 0; width: 100%; max-width: 500px; }
+        div.result-box { background: #fff; padding: 15px; border: 1px solid #ccc; margin-top: 10px; }
+        h2, h3 { color: #333; }
+    </style>
+</head>
+<body>
+
+<h2>🧰 Bitcoin Toolkit - Scanner | Brainwallet | Sleeping BTC</h2>
+
+<!-- Brainwallet search -->
+<section>
+    <h3>🔐 Brainwallet Eray Raadin (e.g. "basswood")</h3>
+    <input type="text" id="brainword" placeholder="Geli eray (e.g. basswood)">
+    <button onclick="searchBrainwallet()">Raadi</button>
+    <div id="brainwalletResult" class="result-box">Natiijo halkan ayay kasoo muuqan doontaa...</div>
+</section>
+
+<!-- Simple word brainwallet scan -->
+<section>
+    <h3>🕯️ Baadh Erayada Fudud (People Names)</h3>
+    <button onclick="searchSimpleWords()">Raadi Erayada Fudud</button>
+    <div id="massResult" class="result-box">...</div>
+</section>
+
+<!-- Sleeping public addresses -->
+<section>
+    <h3>🛌 Cinwaannada Taariikhiga ah ee Lacagta Leh (Sleeping BTC)</h3>
+    <button onclick="scanSleeping()">Falanqee Sleeping Addresses</button>
+    <div id="sleepingResult" class="result-box">...</div>
+</section>
+
+<!-- Normal address scanner -->
+<section>
+    <h3>🔍 Baadh Address Bitcoin kasta</h3>
+    <input type="text" id="btcAddress" placeholder="e.g. 1Ac... or bc1...">
+    <button onclick="checkBalance()">Check Balance & Breakdown</button>
+    <div id="result" class="result-box"></div>
+    <div id="breakdownResult" class="result-box"></div>
+</section>
+
+<!-- Specific real wallet address -->
+<section>
+    <h3>💰 My Wallet: 1Ac2JdpQ5c9NeSajdGx6dofxeXkn4S35ft</h3>
+    <button onclick="checkMyWallet()">Check My Wallet</button>
+    <div id="realWalletResult" class="result-box"></div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/bitcoinjs-lib@6.1.0/dist/bitcoinjs-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.min.js"></script>
+
+<script>
+const simpleWords = ["mohamed", "ahmed", "somalia", "123456", "iloveyou", "basswood", "abdullahi", "naag", "calool", "ali", "fatuma"];
+const sleepingAddresses = [
+    "1FeexV6bAHb8ybZjqQMjJrcCrHGW9sb6uF",
+    "12ib7dApVFvg82TXKycWBNpN8kFyiAN1dr",
+    "1HQ3Go3ggs8pFnXuHVHRytPCq5fGG8Hbhx",
+    "1Di3YUr2KfdKpB8wFdoTCEUXJrH9KfTnB1",
+    "1JryTePceSiWVpoNBU8SbwiT7J4ghzijzW"
+];
+
+// Brainwallet one-word search
+async function searchBrainwallet() {
+    const word = document.getElementById("brainword").value.trim();
+    const resultDiv = document.getElementById("brainwalletResult");
+    if (!word) {
+        resultDiv.innerHTML = "❌ Geli eray.";
+        return;
+    }
+    resultDiv.innerHTML = "⏳ Raadinaya...";
+    try {
+        const sha256 = CryptoJS.SHA256(word).toString();
+        const keyPair = bitcoin.ECPair.fromPrivateKey(Buffer.from(sha256, 'hex'));
+        const { address } = bitcoin.payments.p2pkh({ pubkey: keyPair.publicKey });
+        const res = await fetch(`https://blockstream.info/api/address/${address}`);
+        const data = await res.json();
+        const balance = (data.chain_stats.funded_txo_sum - data.chain_stats.spent_txo_sum) / 100000000;
+        resultDiv.innerHTML = `<b>Eray:</b> ${word}<br><b>Address:</b> ${address}<br><b>Balance:</b> ${balance} BTC`;
+    } catch (e) {
+        resultDiv.innerHTML = "❌ Khalad: " + e.message;
+    }
+}
+
+// Mass simple word brainwallet scan
+async function searchSimpleWords() {
+    const resultDiv = document.getElementById("massResult");
+    resultDiv.innerHTML = "⏳ Falanqaynaya...";
+    for (const word of simpleWords) {
+        try {
+            const sha256 = CryptoJS.SHA256(word).toString();
+            const keyPair = bitcoin.ECPair.fromPrivateKey(Buffer.from(sha256, 'hex'));
+            const { address } = bitcoin.payments.p2pkh({ pubkey: keyPair.publicKey });
+            const res = await fetch(`https://blockstream.info/api/address/${address}`);
+            if (!res.ok) continue;
+            const data = await res.json();
+            const balance = (data.chain_stats.funded_txo_sum - data.chain_stats.spent_txo_sum) / 100000000;
+            resultDiv.innerHTML += `<hr><b>${word}</b>: ${address} → <b>${balance} BTC</b>`;
+        } catch (e) {
+            resultDiv.innerHTML += `<br>❌ Erayga: ${word} – khalad`;
+        }
+    }
+}
+
+// Sleeping addresses checker
+async function scanSleeping() {
+    const resultDiv = document.getElementById("sleepingResult");
+    resultDiv.innerHTML = "⏳ Raadinta addresses...";
+    for (const address of sleepingAddresses) {
+        try {
+            const res = await fetch(`https://blockstream.info/api/address/${address}`);
+            const data = await res.json();
+            const balance = (data.chain_stats.funded_txo_sum - data.chain_stats.spent_txo_sum) / 100000000;
+            resultDiv.innerHTML += `<hr><b>${address}</b> → <b>${balance} BTC</b>`;
+        } catch (e) {
+            resultDiv.innerHTML += `<br>❌ Error: ${e.message}`;
+        }
+    }
+}
+
+// Normal address balance + breakdown
+async function checkBalance() {
+    const address = document.getElementById("btcAddress").value.trim();
+    const resultDiv = document.getElementById("result");
+    const breakdownDiv = document.getElementById("breakdownResult");
+    if (!address) {
+        resultDiv.innerHTML = "❌ Geli cinwaan.";
+        return;
+    }
+    resultDiv.innerHTML = "⏳ Raadinta...";
+    try {
+        const res = await fetch(`https://blockstream.info/api/address/${address}`);
+        const data = await res.json();
+        const confirmed = data.chain_stats.funded_txo_sum - data.chain_stats.spent_txo_sum;
+        const unconfirmed = data.mempool_stats.funded_txo_sum - data.mempool_stats.spent_txo_sum;
+        const total = (confirmed + unconfirmed) / 100000000;
+        resultDiv.innerHTML = `<b>Confirmed:</b> ${confirmed / 100000000} BTC<br>
+                               <b>Unconfirmed:</b> ${unconfirmed / 100000000} BTC<br>
+                               <b>Total:</b> ${total} BTC`;
+        breakdownDiv.innerHTML = `<b>Type:</b> ${address.startsWith("1") ? "Legacy" : address.startsWith("3") ? "P2SH" : "Bech32"}<br>
+                                  <b>Length:</b> ${address.length}`;
+    } catch (e) {
+        resultDiv.innerHTML = "❌ Error: " + e.message;
+        breakdownDiv.innerHTML = "";
+    }
+}
+
+// Real wallet balance check
+async function checkMyWallet() {
+    const resultDiv = document.getElementById("realWalletResult");
+    const address = "1Ac2JdpQ5c9NeSajdGx6dofxeXkn4S35ft";
+    try {
+        const res = await fetch(`https://blockstream.info/api/address/${address}`);
+        const data = await res.json();
+        const balance = (data.chain_stats.funded_txo_sum - data.chain_stats.spent_txo_sum) / 100000000;
+        resultDiv.innerHTML = `<b>Address:</b> ${address}<br><b>Balance:</b> ${balance} BTC`;
+    } catch (e) {
+        resultDiv.innerHTML = "❌ Error: " + e.message;
+    }
+}
+</script>
+
+</body>
+</html>
